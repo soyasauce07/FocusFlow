@@ -6,7 +6,7 @@ FocusFlow is a minimalist Pomodoro timer app built using Flutter. It helps you s
 
 ## 🚀 Features
 
-- 25-minute work and 5-minute break timers
+- Pomodoro app with customizable Focus and Break times
 - Clean and modern UI with light/dark mode support
 - Countdown animation for session progress
 - Cross-platform: Works on Android and Web (Chrome)
