@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'theme_notifier.dart';
+import 'package:flutter/cupertino.dart';
+
 
 
 final themeNotifier = ThemeNotifier();
@@ -22,12 +24,11 @@ class MyApp extends StatelessWidget {
   final ThemeMode themeMode;
   const MyApp({super.key, required this.themeMode});
 
-
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FocusFlow',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
@@ -38,34 +39,48 @@ class MyApp extends StatelessWidget {
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.teal, brightness: Brightness.dark),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF121212),
           foregroundColor: Colors.white,
         ),
       ),
-      themeMode: ThemeMode.system,
-
-
+      themeMode: themeMode,
       home: const HomeScreen(),
     );
   }
 }
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark; // ✅ Declare isDark here
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('FocusFlow - Pomodoro'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(isDark ? Icons.wb_sunny : Icons.nightlight_round),
+            tooltip: 'Toggle Theme',
+            onPressed: () {
+              themeNotifier.value =
+              isDark ? ThemeMode.light : ThemeMode.dark;
+            },
+          ),
+        ],
       ),
       body: const PomodoroBody(),
     );
   }
+
 }
+
 
 class PomodoroBody extends StatefulWidget {
   const PomodoroBody({super.key});
@@ -80,8 +95,23 @@ TimerMode _currentMode = TimerMode.focus;
 
 class _PomodoroBodyState extends State<PomodoroBody> {
   final AudioPlayer _audioPlayer = AudioPlayer();
-  static const int _focusDuration = 10;
-  static const int _breakDuration = 5;
+  int _focusDuration = 1500; // default 25 min
+  int _breakDuration = 300;  // default 5 min
+
+  int _focusMinutes = 10;
+  int _focusSeconds = 0;
+  int _breakMinutes = 5;
+  int _breakSeconds = 0;
+
+
+
+  @override
+  void initState() {
+    super.initState();
+    _remainingSeconds = _focusDuration;
+  }
+
+
 
   double get _progress {
     final total = _currentMode == TimerMode.focus ? _focusDuration : _breakDuration;
@@ -89,12 +119,57 @@ class _PomodoroBodyState extends State<PomodoroBody> {
   }
 
 
-  int _remainingSeconds = _focusDuration;
+  late int _remainingSeconds;
+
   TimerMode _currentMode = TimerMode.focus;
   bool _isRunning = false;
   Timer? _timer;
 
-  // ... rest of the code
+  void _showDurationPicker({
+    required BuildContext context,
+    required Duration initialDuration,
+    required void Function(Duration) onDurationSelected,
+  }) {
+    Duration tempDuration = initialDuration;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).dialogBackgroundColor,
+          contentPadding: const EdgeInsets.all(8),
+          content: SizedBox(
+            height: 200,
+            width: 300,
+            child: CupertinoTimerPicker(
+              mode: CupertinoTimerPickerMode.hms,
+              initialTimerDuration: initialDuration,
+              onTimerDurationChanged: (Duration newDuration) {
+                tempDuration = newDuration;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onDurationSelected(tempDuration);
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 
 
   void _startTimer() {
@@ -132,6 +207,31 @@ class _PomodoroBodyState extends State<PomodoroBody> {
     });
   }
 
+  void _showTimerPickerDialog({
+    required Duration initialDuration,
+    required Function(Duration) onDurationChanged,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).dialogBackgroundColor,
+          contentPadding: const EdgeInsets.all(16),
+          content: SizedBox(
+            height: 180,
+            child: CupertinoTimerPicker(
+              mode: CupertinoTimerPickerMode.hms,
+              initialTimerDuration: initialDuration,
+              onTimerDurationChanged: onDurationChanged,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
   void _resetTimer() {
     _timer?.cancel();
     setState(() {
@@ -157,10 +257,17 @@ class _PomodoroBodyState extends State<PomodoroBody> {
 
 
   String _formatTime(int totalSeconds) {
-    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
-    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    final hoursStr = hours.toString().padLeft(2, '0');
+    final minutesStr = minutes.toString().padLeft(2, '0');
+    final secondsStr = seconds.toString().padLeft(2, '0');
+
+    return '$hoursStr:$minutesStr:$secondsStr';
   }
+
 
   @override
   void dispose() {
@@ -201,13 +308,37 @@ class _PomodoroBodyState extends State<PomodoroBody> {
                       ),
                     ),
                   ),
-                  Text(
-                    _formatTime(_remainingSeconds),
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                  GestureDetector(
+                    onTap: () {
+                      _showDurationPicker(
+                        context: context,
+                        initialDuration: Duration(
+                          seconds: _currentMode == TimerMode.focus ? _focusDuration : _breakDuration,
+                        ),
+                        onDurationSelected: (duration) {
+                          setState(() {
+                            if (_currentMode == TimerMode.focus) {
+                              _focusDuration = duration.inSeconds;
+                              _remainingSeconds = _focusDuration;
+                            } else {
+                              _breakDuration = duration.inSeconds;
+                              _remainingSeconds = _breakDuration;
+                            }
+                          });
+                        },
+                      );
+                    },
+
+                    child: Text(
+                      _formatTime(_remainingSeconds),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+
+
                 ],
               );
             },
@@ -245,7 +376,7 @@ class _PomodoroBodyState extends State<PomodoroBody> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.0),
             child: Text(
-              '"Your motivational quote will appear here."',
+              '"u i i a e u u i a i (motivational quote plceholder)."',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
             ),
