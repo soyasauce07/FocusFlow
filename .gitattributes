@@ -1,6 +1,14 @@
+# Force Dart, Kotlin, Java to be detected
 *.dart linguist-detectable=true
-*.cmake linguist-detectable=false
-CMakeLists.txt linguist-detectable=false
-*.gradle linguist-detectable=true
 *.kt linguist-detectable=true
 *.java linguist-detectable=true
+
+# Ignore generated/native/irrelevant files
+/android/** linguist-vendored
+/ios/** linguist-vendored
+/macos/** linguist-vendored
+/windows/** linguist-vendored
+/linux/** linguist-vendored
+/build/** linguist-generated
+**/*.cmake linguist-detectable=false
+CMakeLists.txt linguist-detectable=false
